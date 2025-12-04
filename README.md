@@ -1,4 +1,4 @@
-**Overlight v1.0**
+# **Overlight v1.0**
 
 Hotkeys: Ctrl+Alt+Up (Increase), Ctrl+Alt+Down (Decrease), Ctrl+Alt+Esc (Exit)
 
