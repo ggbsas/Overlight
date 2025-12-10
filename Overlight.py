@@ -234,7 +234,7 @@ def run_tray_icon():
     global _tray_icon, _slider_widget, _running, _slider
 
     app = QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(False)  # No cerrar al cerrar ventanas
+    app.setQuitOnLastWindowClosed(False)
 
     dark_style = """
         /* Colores oscuros globales */
@@ -292,7 +292,6 @@ def run_tray_icon():
         """
     app.setStyleSheet(dark_style)
 
-    # Crear el slider widget
     _slider_widget = QWidget()
     _slider_widget.setAttribute(Qt.WA_TranslucentBackground)
     _slider_widget.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
@@ -309,17 +308,13 @@ def run_tray_icon():
     _slider_widget.setLayout(layout)
     _slider_widget.hide()
 
-    # Definir la clase EventFilter para manejar clics fuera del slider
     class EventFilter(QObject):
         def eventFilter(self, obj, event):
             if event.type() == QEvent.MouseButtonPress and _slider_widget.isVisible():
-                # Obtener el widget bajo el cursor en la posición del clic
                 widget_under_cursor = app.widgetAt(event.globalPos())
-                # Verificar si el widget bajo el cursor es el slider o uno de sus hijos
                 if widget_under_cursor is None or not _slider_widget.isAncestorOf(widget_under_cursor):
                     hide_slider()
-            return False  # No consumir el evento
-    # Instalar el event filter una vez al inicio
+            return False
     event_filter = EventFilter()
     app.installEventFilter(event_filter)
 
@@ -329,11 +324,9 @@ def run_tray_icon():
 
     app.focusChanged.connect(on_focus_changed)
 
-    # Crear el icono de la bandeja
     try:
         icon_data = base64.b64decode(ICON_BASE64_DATA)
         icon_image = Image.open(BytesIO(icon_data))
-        # Convertir PIL Image a QImage (asegurarse de formato RGBA)
         icon_image = icon_image.convert("RGBA")
         data = icon_image.tobytes("raw", "RGBA")
         qimage = QImage(data, icon_image.size[0], icon_image.size[1], QImage.Format_RGBA8888)
@@ -348,7 +341,6 @@ def run_tray_icon():
     _tray_icon = QSystemTrayIcon(icon)
     _tray_icon.setToolTip(f"Overlight: {initial_brightness}%")
 
-    # Menú de la bandeja
     menu = QMenu()
     increase_action = QAction("Increase Brightness", menu)
     increase_action.triggered.connect(lambda: update_opacity(-_step_percent))
@@ -362,21 +354,17 @@ def run_tray_icon():
 
     def exit_app():
         global _running, _hwnd
-        _running = False  # Detener el overlay thread
-        hide_slider()  # Ocultar slider si está abierto
+        _running = False
+        hide_slider()
         if _hwnd:
             user32.PostMessageW(_hwnd, WM_CLOSE, 0, 0)
-        app.quit()  # Cerrar PyQt
+        app.quit()
 
     exit_action = QAction("Exit", menu)
     exit_action.triggered.connect(exit_app)
     menu.addAction(exit_action)
-
     _tray_icon.setContextMenu(menu)
-
-    # Conectar clic izquierdo para mostrar el slider
     _tray_icon.activated.connect(lambda reason: show_slider() if reason == QSystemTrayIcon.Trigger else None)
-
     _tray_icon.show()
 
     app.exec_()
