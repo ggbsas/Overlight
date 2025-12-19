@@ -16,7 +16,10 @@ def set_dpi_awareness():
 
 def set_low_priority():
     try:
-        p = psutil.Process(os.getpid())
-        p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+        child = psutil.Process(os.getpid())
+        child.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+        parent = child.parent()
+        if parent:
+            parent.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
     except:
         pass
