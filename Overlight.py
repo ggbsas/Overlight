@@ -1,9 +1,9 @@
-import os
 import sys
 import time
-import json
+import data
+import gamma
+import utils
 import ctypes
-import psutil
 import base64
 import iconbase
 import threading
@@ -15,8 +15,6 @@ from PyQt5.QtGui import QIcon, QPixmap, QImage, QCursor
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction, QWidget, QVBoxLayout, QSlider, QFrame
 
 user32 = ctypes.windll.user32
-gdi32 = ctypes.windll.gdi32
-shcore = ctypes.windll.shcore if hasattr(ctypes.windll, "shcore") else None
 WM_HOTKEY = 0x0312
 VK_UP = 0x26
 VK_DOWN = 0x28
@@ -31,59 +29,12 @@ _slider = None
 _slider_root = None
 _slider_widget = None
 _running = True
-CONFIG_DIR = "data"
-CONFIG_FILE = "config.json"
-DEFAULT_OPACITY = 50
-CONFIG_PATH = os.path.join(CONFIG_DIR, CONFIG_FILE)
-
-def load_config():
-    try:
-        with open(CONFIG_PATH, 'r') as f:
-            config = json.load(f)
-            opacity = int(config.get('opacity_percent', DEFAULT_OPACITY))
-            opacity = max(0, min(50, opacity))
-            return opacity
-    except (FileNotFoundError, json.JSONDecodeError):
-        return DEFAULT_OPACITY
-    except Exception as e:
-        return DEFAULT_OPACITY
-
-def save_config():
-    global _current_opacity
-
-    config = {'opacity_percent': _current_opacity}
-
-    try:
-        os.makedirs(CONFIG_DIR, exist_ok=True)
-    except Exception as e:
-        return
-    try:
-        with open(CONFIG_PATH, 'w') as f:
-            json.dump(config, f, indent=4)
-    except Exception as e:
-        pass
-
-def set_dpi_awareness():
-    try:
-        shcore.SetProcessDpiAwareness(1)
-    except Exception:
-        try:
-            user32.SetProcessDPIAware()
-        except Exception:
-            pass
-
-def set_low_priority():
-    try:
-        p = psutil.Process(os.getpid())
-        p.nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
-    except:
-        pass
 
 def update_opacity(change):
     global _current_opacity, _tray_icon, _slider
 
     _current_opacity = max(0, min(50, _current_opacity + change))
-    set_gamma_brightness(_current_opacity)
+    gamma.set_gamma_brightness(_current_opacity)
     brightness_percent = 100 - _current_opacity
     msg = f"Overlight: {brightness_percent}%"
 
@@ -91,34 +42,6 @@ def update_opacity(change):
         _tray_icon.setToolTip(msg)
     if _slider and _slider_widget and _slider_widget.isVisible():
         _slider.setValue(brightness_percent)
-
-def set_gamma_brightness(opacity_percent):
-    level = max(0.5, (100 - opacity_percent) / 100.0)
-    hdc = user32.GetDC(None)
-    ramp = (wintypes.WORD * 768)()
-    for i in range(256):
-        val = int(i * level * 257)
-        if val > 65535:
-            val = 65535
-
-        ramp[i] = ramp[i+256] = ramp[i+512] = val
-    gdi32.SetDeviceGammaRamp(hdc, ctypes.byref(ramp))
-    user32.ReleaseDC(None, hdc)
-
-def reset_gamma_ramp():
-    try:
-        hdc = user32.GetDC(None)
-        ramp = (wintypes.WORD * 768)()
-        for i in range(256):
-            val = int(i * 257)
-            if val > 65535:
-                val = 65535
-
-            ramp[i] = ramp[i + 256] = ramp[i + 512] = val
-        gdi32.SetDeviceGammaRamp(hdc, ctypes.byref(ramp))
-        user32.ReleaseDC(None, hdc)
-    except:
-        pass
 
 def make_overlay(initial_percent, step_percent):
     global _current_opacity, _step_percent
@@ -130,7 +53,7 @@ def make_overlay(initial_percent, step_percent):
     user32.RegisterHotKey(None, 2, modifiers, VK_DOWN)
     user32.RegisterHotKey(None, 3, modifiers, VK_ESCAPE)
     update_opacity(0)
-    set_gamma_brightness(_current_opacity)
+    gamma.set_gamma_brightness(_current_opacity)
     msg = wintypes.MSG()
     last_check_time = time.time()
 
@@ -150,17 +73,17 @@ def make_overlay(initial_percent, step_percent):
                 user32.DispatchMessageW(ctypes.byref(msg))
             current_time = time.time()
             if current_time - last_check_time > 2.0:
-                set_gamma_brightness(_current_opacity)
+                gamma.set_gamma_brightness(_current_opacity)
                 last_check_time = current_time
 
             time.sleep(0.1)
 
     finally:
-        save_config()
+        data.save_config(_current_opacity)
         user32.UnregisterHotKey(None, 1)
         user32.UnregisterHotKey(None, 2)
         user32.UnregisterHotKey(None, 3)
-        reset_gamma_ramp()
+        gamma.reset_gamma_ramp()
 
 def show_slider():
     global _slider_widget, _current_opacity, _slider
@@ -310,7 +233,7 @@ def run_tray_icon():
         global _running
         _running = False
         hide_slider()
-        reset_gamma_ramp()
+        gamma.reset_gamma_ramp()
         time.sleep(0.5)
         app.quit()
 
@@ -324,9 +247,9 @@ def run_tray_icon():
     app.exec_()
 
 if __name__ == "__main__":
-    set_dpi_awareness()
-    set_low_priority()
-    initial_opacity = load_config()
+    utils.set_dpi_awareness()
+    utils.set_low_priority()
+    initial_opacity = data.load_config()
     step = 5
     overlay_thread = threading.Thread(target=make_overlay, args=(initial_opacity, step))
     overlay_thread.daemon = True
