@@ -1,33 +1,64 @@
 import ctypes
 from ctypes import wintypes
 
-user32 = ctypes.windll.user32
-gdi32 = ctypes.windll.gdi32
+class MAGFULLSCREEN_COLOR_EFFECT(ctypes.Structure):
+    _fields_ = [
+        ("transform", ctypes.c_float * 25)
+    ]
+
+class MagBrightnessController:
+    def __init__(self):
+        self.mag_dll = None
+        self.initialized = False
+
+        try:
+            self.mag_dll = ctypes.WinDLL("magnification.dll")
+            self.mag_dll.MagInitialize.restype = wintypes.BOOL
+            self.mag_dll.MagUninitialize.restype = wintypes.BOOL
+            self.mag_dll.MagSetFullscreenColorEffect.argtypes = [ctypes.POINTER(MAGFULLSCREEN_COLOR_EFFECT)]
+            self.mag_dll.MagSetFullscreenColorEffect.restype = wintypes.BOOL
+
+            if not self.mag_dll.MagInitialize():
+                raise RuntimeError("No se pudo inicializar Magnification API")
+
+            self.initialized = True
+        except:
+            pass
+
+_controller = MagBrightnessController()
 
 def set_gamma_brightness(opacity_percent):
-    level = max(0.5, (100 - opacity_percent) / 100.0)
-    hdc = user32.GetDC(None)
-    ramp = (wintypes.WORD * 768)()
-    for i in range(256):
-        val = int(i * level * 257)
-        if val > 65535:
-            val = 65535
+    if not _controller.initialized:
+        return False
 
-        ramp[i] = ramp[i+256] = ramp[i+512] = val
-    gdi32.SetDeviceGammaRamp(hdc, ctypes.byref(ramp))
-    user32.ReleaseDC(None, hdc)
+    level = max(0.0, min(1.0, (100 - opacity_percent) / 100.0))
+
+    matrix = MAGFULLSCREEN_COLOR_EFFECT(
+        (ctypes.c_float * 25)(
+            level, 0, 0, 0, 0,
+            0, level, 0, 0, 0,
+            0, 0, level, 0, 0,
+            0, 0, 0, 1, 0,
+            0, 0, 0, 0, 1
+        )
+    )
+
+    return _controller.mag_dll.MagSetFullscreenColorEffect(ctypes.byref(matrix))
 
 def reset_gamma_ramp():
-    try:
-        hdc = user32.GetDC(None)
-        ramp = (wintypes.WORD * 768)()
-        for i in range(256):
-            val = int(i * 257)
-            if val > 65535:
-                val = 65535
+    if not _controller.initialized:
+        return
 
-            ramp[i] = ramp[i + 256] = ramp[i + 512] = val
-        gdi32.SetDeviceGammaRamp(hdc, ctypes.byref(ramp))
-        user32.ReleaseDC(None, hdc)
-    except:
-        pass
+    identity = MAGFULLSCREEN_COLOR_EFFECT(
+        (ctypes.c_float * 25)(
+            1, 0, 0, 0, 0,
+            0, 1, 0, 0, 0,
+            0, 0, 1, 0, 0,
+            0, 0, 0, 1, 0,
+            0, 0, 0, 0, 1
+        )
+    )
+
+    _controller.mag_dll.MagSetFullscreenColorEffect(ctypes.byref(identity))
+    _controller.mag_dll.MagUninitialize()
+    _controller.initialized = False
