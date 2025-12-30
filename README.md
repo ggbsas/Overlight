@@ -22,7 +22,7 @@ The app runs in the system tray and remains active in the background until close
 - Low CPU and memory usage, with no input lag or FPS drop
 - No driver or modify any system or hardware settings
 - No administrator privileges required
-- Overlight does not appear in screenshots
+- Overlight may appear in screenshots
 - Compatible with Windows 10/11 on any monitor
 
 ---
