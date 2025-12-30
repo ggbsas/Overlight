@@ -19,7 +19,7 @@ class MagBrightnessController:
             self.mag_dll.MagSetFullscreenColorEffect.restype = wintypes.BOOL
 
             if not self.mag_dll.MagInitialize():
-                raise RuntimeError("No se pudo inicializar Magnification API")
+                return
 
             self.initialized = True
         except:
@@ -27,7 +27,7 @@ class MagBrightnessController:
 
 _controller = MagBrightnessController()
 
-def set_gamma_brightness(opacity_percent):
+def set_magapi_brightness(opacity_percent):
     if not _controller.initialized:
         return False
 
@@ -45,7 +45,7 @@ def set_gamma_brightness(opacity_percent):
 
     return _controller.mag_dll.MagSetFullscreenColorEffect(ctypes.byref(matrix))
 
-def reset_gamma_ramp():
+def reset_magapi_ramp():
     if not _controller.initialized:
         return
 
