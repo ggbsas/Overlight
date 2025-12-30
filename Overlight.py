@@ -2,25 +2,16 @@ import sys
 import time
 import data
 import utils
-import ctypes
 import base64
 import magapi
 import iconbase
 import threading
 from PIL import Image
 from io import BytesIO
-from ctypes import wintypes
 from PyQt5.QtCore import Qt, QEvent, QObject, QTimer
 from PyQt5.QtGui import QIcon, QPixmap, QImage, QCursor
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction, QWidget, QVBoxLayout, QSlider, QFrame
 
-user32 = ctypes.windll.user32
-WM_HOTKEY = 0x0312
-VK_UP = 0x26
-VK_DOWN = 0x28
-VK_ESCAPE = 0x1B
-MOD_ALT = 0x0001
-MOD_CONTROL = 0x0002
 ICON_BASE64_DATA = iconbase.icon_base
 _current_opacity = 50
 _step_percent = 5
@@ -48,35 +39,15 @@ def make_overlay(initial_percent, step_percent):
 
     _current_opacity = initial_percent
     _step_percent = step_percent
-    modifiers = MOD_CONTROL | MOD_ALT
-    user32.RegisterHotKey(None, 1, modifiers, VK_UP)
-    user32.RegisterHotKey(None, 2, modifiers, VK_DOWN)
-    user32.RegisterHotKey(None, 3, modifiers, VK_ESCAPE)
     update_opacity(0)
     magapi.set_magapi_brightness(_current_opacity)
-    msg = wintypes.MSG()
 
     try:
         while _running:
-            while user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, 1):
-                if msg.message == WM_HOTKEY:
-                    kid = int(msg.wParam)
-                    if kid == 1:
-                        update_opacity(-_step_percent)
-                    elif kid == 2:
-                        update_opacity(_step_percent)
-                    elif kid == 3:
-                        break
-
-                user32.TranslateMessage(ctypes.byref(msg))
-                user32.DispatchMessageW(ctypes.byref(msg))
             time.sleep(0.1)
 
     finally:
         data.save_config(_current_opacity)
-        user32.UnregisterHotKey(None, 1)
-        user32.UnregisterHotKey(None, 2)
-        user32.UnregisterHotKey(None, 3)
         magapi.reset_magapi_ramp()
 
 def show_slider():
