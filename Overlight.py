@@ -1,16 +1,16 @@
 import sys
 import time
 import data
-import gamma
 import utils
 import ctypes
 import base64
+import magapi
 import iconbase
 import threading
 from PIL import Image
 from io import BytesIO
 from ctypes import wintypes
-from PyQt5.QtCore import Qt, QEvent, QObject
+from PyQt5.QtCore import Qt, QEvent, QObject, QTimer
 from PyQt5.QtGui import QIcon, QPixmap, QImage, QCursor
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction, QWidget, QVBoxLayout, QSlider, QFrame
 
@@ -33,8 +33,8 @@ _running = True
 def update_opacity(change):
     global _current_opacity, _tray_icon, _slider
 
-    _current_opacity = max(0, min(50, _current_opacity + change))
-    gamma.set_gamma_brightness(_current_opacity)
+    _current_opacity = max(0, min(80, _current_opacity + change))
+    magapi.set_magapi_brightness(_current_opacity)
     brightness_percent = 100 - _current_opacity
     msg = f"Overlight: {brightness_percent}%"
 
@@ -53,9 +53,8 @@ def make_overlay(initial_percent, step_percent):
     user32.RegisterHotKey(None, 2, modifiers, VK_DOWN)
     user32.RegisterHotKey(None, 3, modifiers, VK_ESCAPE)
     update_opacity(0)
-    gamma.set_gamma_brightness(_current_opacity)
+    magapi.set_magapi_brightness(_current_opacity)
     msg = wintypes.MSG()
-    last_check_time = time.time()
 
     try:
         while _running:
@@ -71,11 +70,6 @@ def make_overlay(initial_percent, step_percent):
 
                 user32.TranslateMessage(ctypes.byref(msg))
                 user32.DispatchMessageW(ctypes.byref(msg))
-            current_time = time.time()
-            if current_time - last_check_time > 2.0:
-                gamma.set_gamma_brightness(_current_opacity)
-                last_check_time = current_time
-
             time.sleep(0.1)
 
     finally:
@@ -83,7 +77,7 @@ def make_overlay(initial_percent, step_percent):
         user32.UnregisterHotKey(None, 1)
         user32.UnregisterHotKey(None, 2)
         user32.UnregisterHotKey(None, 3)
-        gamma.reset_gamma_ramp()
+        magapi.reset_magapi_ramp()
 
 def show_slider():
     global _slider_widget, _current_opacity, _slider
@@ -178,7 +172,7 @@ def run_tray_icon():
     layout = QVBoxLayout()
     layout.setContentsMargins(5, 0, 5, 0)
     _slider = QSlider(Qt.Horizontal)
-    _slider.setRange(50, 100)
+    _slider.setRange(20, 100)
     _slider.setValue(100 - _current_opacity)
     _slider.valueChanged.connect(update_from_slider)
     layout.addWidget(_slider)
@@ -233,7 +227,7 @@ def run_tray_icon():
         global _running
         _running = False
         hide_slider()
-        gamma.reset_gamma_ramp()
+        magapi.reset_magapi_ramp()
         time.sleep(0.5)
         app.quit()
 
@@ -243,7 +237,7 @@ def run_tray_icon():
     _tray_icon.setContextMenu(menu)
     _tray_icon.activated.connect(lambda reason: show_slider() if reason == QSystemTrayIcon.Trigger else None)
     _tray_icon.show()
-
+    QTimer.singleShot(500, lambda: magapi.set_magapi_brightness(_current_opacity))
     app.exec_()
 
 if __name__ == "__main__":
